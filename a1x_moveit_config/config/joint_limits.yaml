@@ -2,8 +2,8 @@
 
 # 默认缩放因子：建议初学者保持 0.1，确保运动安全缓慢。
 # 以后想让机械臂跑快点，可以将这两个值改大（最大 1.0）。
-default_velocity_scaling_factor: 0.1
-default_acceleration_scaling_factor: 0.1
+default_velocity_scaling_factor: 1.0
+default_acceleration_scaling_factor: 1.0
 
 # 关节属性设置
 # [has_velocity_limits, has_acceleration_limits] 必须为 true，MoveIt 才能计算时间轨迹。
