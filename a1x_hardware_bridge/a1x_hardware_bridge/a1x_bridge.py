@@ -40,6 +40,9 @@ class A1XTrajectoryBridge(Node):
         self.last_sent_positions = [0.0] * 6
         self.last_sent_velocities = [0.0] * 6
 
+        # 存储每个关节的最后大于0.01的速度值
+        self.last_above_threshold_velocities = [0.4] * 6
+
         # 添加标志来跟踪是否有活动轨迹
         self.has_active_trajectory = False
 
@@ -93,13 +96,30 @@ class A1XTrajectoryBridge(Node):
             self.get_logger().info("检测到全零消息，跳过发布")
             return
 
-        # 如果position中有任意一个非零值，且velocity中有任意一个为0，则将为0的velocity替换为0.1
+        # 如果position中有任意一个非零值，且velocity中有任意一个为0，则将为0的velocity替换为当前坐标的速度值
         if self._has_nonzero_position(cmd_msg.position) and self._has_zero_velocity(
             cmd_msg.velocity
         ):
             for i in range(6):
-                if cmd_msg.velocity[i] == 0.0:
-                    cmd_msg.velocity[i] = 1.0
+                # 重新获取当前关节的实际速度值，如果为0则使用最后大于0.01的速度值
+                current_joint_idx = -1
+                try:
+                    current_joint_idx = msg.joint_names.index(self.joint_names[i])
+                    actual_velocity = 0.0
+                    if len(msg.reference.velocities) > current_joint_idx:
+                        actual_velocity = round(
+                            msg.reference.velocities[current_joint_idx], 4
+                        )
+
+                    if cmd_msg.velocity[i] == 0.0 and actual_velocity == 0.0:
+                        # 如果从控制器获取的实际速度也为0，使用最后大于0.01的速度值
+                        cmd_msg.velocity[i] = self.last_above_threshold_velocities[i]
+                    elif abs(actual_velocity) > 0.5:
+                        # 更新最后大于0.01的速度值，确保任何非零速度都被记录
+                        self.last_above_threshold_velocities[i] = actual_velocity
+                except ValueError:
+                    # 如果在控制器状态中未找到该关节，使用最后大于0.01的速度值
+                    cmd_msg.velocity[i] = self.last_above_threshold_velocities[i]
 
         # 检查是否有变化，如果有则发布到机械臂
         if (
