@@ -21,15 +21,13 @@ a1x_group_controller:
       - arm_joint6
     command_interfaces:
       - position
-      # - velocity   # 增加速度指令接口
-      # - acceleration # 如果硬件驱动器支持，可考虑添加
     state_interfaces:
       - position
       - velocity
     allow_nonzero_velocity_at_trajectory_end: false
     # 添加关节速度限制，与joint_limits.yaml保持一致
     constraints:
-      goal_time: 0.5
+      goal_time: 0.1
       stopped_velocity_tolerance: 0.01
       arm_joint1:
         trajectory: 10.472

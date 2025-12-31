@@ -12,29 +12,29 @@ joint_limits:
     has_velocity_limits: true
     max_velocity: 10.472
     has_acceleration_limits: true  # 修改为 true
-    max_acceleration: 15.26         # 对应峰值角加速度 2.26 rad/s²
+    max_acceleration: 2.26         # 对应峰值角加速度 2.26 rad/s²
   arm_joint2:
     has_velocity_limits: true
     max_velocity: 12.5664
     has_acceleration_limits: true  # 修改为 true
-    max_acceleration: 20.27         # 对应峰值角加速度 3.27 rad/s²
+    max_acceleration: 3.27         # 对应峰值角加速度 3.27 rad/s²
   arm_joint3:
     has_velocity_limits: true
     max_velocity: 10.472
     has_acceleration_limits: true  # 修改为 true
-    max_acceleration: 15.26         # 对应峰值角加速度 2.26 rad/s²
+    max_acceleration: 2.26         # 对应峰值角加速度 2.26 rad/s²
   arm_joint4:
     has_velocity_limits: true
     max_velocity: 32.9867
     has_acceleration_limits: true  # 修改为 true
-    max_acceleration: 52.99        # 对应峰值角加速度 32.99 rad/s²
+    max_acceleration: 32.99        # 对应峰值角加速度 32.99 rad/s²
   arm_joint5:
     has_velocity_limits: true
     max_velocity: 32.9867
     has_acceleration_limits: true  # 修改为 true
-    max_acceleration: 52.99        # 对应峰值角加速度 32.99 rad/s²
+    max_acceleration: 32.99        # 对应峰值角加速度 32.99 rad/s²
   arm_joint6:
     has_velocity_limits: true
     max_velocity: 32.9867
     has_acceleration_limits: true  # 修改为 true
-    max_acceleration: 52.99        # 对应峰值角加速度 32.99 rad/s²
+    max_acceleration: 32.99        # 对应峰值角加速度 32.99 rad/s²

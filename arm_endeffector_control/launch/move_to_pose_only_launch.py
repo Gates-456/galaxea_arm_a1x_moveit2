@@ -22,29 +22,15 @@ def generate_launch_description():
         default_value='false',
         description='Use simulation time')
 
-    velocity_scaling_factor_arg = DeclareLaunchArgument(
-        'velocity_scaling_factor',
-        default_value='0.1',  # 默认速度缩放为0.1（较慢）
-        description='Scaling factor for velocity (0.0 to 1.0)')
-
-    acceleration_scaling_factor_arg = DeclareLaunchArgument(
-        'acceleration_scaling_factor',
-        default_value='0.1',  # 默认加速度缩放为0.1
-        description='Scaling factor for acceleration (0.0 to 1.0)')
-
     # 获取参数
     move_group_name = LaunchConfiguration('move_group_name')
     end_effector_link = LaunchConfiguration('end_effector_link')
     use_sim_time = LaunchConfiguration('use_sim_time')
-    velocity_scaling_factor = LaunchConfiguration('velocity_scaling_factor')
-    acceleration_scaling_factor = LaunchConfiguration('acceleration_scaling_factor')
 
     return LaunchDescription([
         move_group_name_arg,
         end_effector_link_arg,
         use_sim_time_arg,
-        velocity_scaling_factor_arg,
-        acceleration_scaling_factor_arg,
         
         Node(
             package='arm_endeffector_control',
@@ -54,9 +40,7 @@ def generate_launch_description():
             parameters=[
                 {'move_group_name': move_group_name},
                 {'end_effector_link': end_effector_link},
-                {'use_sim_time': use_sim_time},
-                {'velocity_scaling_factor': velocity_scaling_factor},
-                {'acceleration_scaling_factor': acceleration_scaling_factor}
+                {'use_sim_time': use_sim_time}
             ]
         )
     ])

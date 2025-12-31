@@ -85,9 +85,9 @@ class A1XTrajectoryBridge(Node):
                 # # 可选：使用加速度
                 # if len(msg.reference.accelerations) > controller_joint_idx:
                 #     # 使用固定小数点格式，只保留小数点后4位，避免科学计数法
-                #     cmd_msg.effort[i] = msg.reference.accelerations[
-                #         controller_joint_idx
-                #     ]
+                #     cmd_msg.effort[i] = round(
+                #         msg.reference.accelerations[controller_joint_idx], 4
+                #     )
             except ValueError:
                 self.get_logger().warn(f"关节 {our_joint_name} 在控制器状态中未找到")
 
