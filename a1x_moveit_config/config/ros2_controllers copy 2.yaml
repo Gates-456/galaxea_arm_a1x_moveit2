@@ -1,10 +1,14 @@
-# ros2_controllers.yaml
+# This config file is used by ros2_control
 controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
 
     a1x_group_controller:
       type: joint_trajectory_controller/JointTrajectoryController
+
+
+    # joint_state_broadcaster:
+    #   type: joint_state_broadcaster/JointStateBroadcaster  # 已禁用，使用 joint_state_remap 节点代替
 
 a1x_group_controller:
   ros__parameters:
@@ -17,14 +21,13 @@ a1x_group_controller:
       - arm_joint6
     command_interfaces:
       - position
+      # - velocity   # 增加速度指令接口
+      # - acceleration # 如果硬件驱动器支持，可考虑添加
     state_interfaces:
       - position
       - velocity
     allow_nonzero_velocity_at_trajectory_end: false
-    state_publish_rate: 100.0
-    action_monitor_rate: 100.0
-    interpolation_method: "splines"
-    
+    # 添加关节速度限制，与joint_limits.yaml保持一致
     constraints:
       goal_time: 0.5
       stopped_velocity_tolerance: 0.01

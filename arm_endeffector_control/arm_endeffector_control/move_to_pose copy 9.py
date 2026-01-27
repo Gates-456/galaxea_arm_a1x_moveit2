@@ -47,27 +47,27 @@ class UltimateMoveToPoseNode(Node):
         # 声明参数
         self.declare_parameter("move_group_name", "a1x_group")
         self.declare_parameter("end_effector_link", "arm_link6")
-        self.declare_parameter("velocity_scaling", 1.0)
-        self.declare_parameter("acceleration_scaling", 1.0)
-        self.declare_parameter("cartesian_step_size", 0.008)
-        self.declare_parameter("planning_time", 5.0)
-        self.declare_parameter("num_planning_attempts", 10)
-        self.declare_parameter("position_tolerance", 0.005)
-        self.declare_parameter("orientation_tolerance", 0.05)
+        self.declare_parameter("velocity_scaling", 0.5)
+        self.declare_parameter("acceleration_scaling", 0.5)
+        self.declare_parameter("cartesian_step_size", 0.002)
+        self.declare_parameter("planning_time", 3.0)
+        self.declare_parameter("num_planning_attempts", 5)
+        self.declare_parameter("position_tolerance", 0.003)
+        self.declare_parameter("orientation_tolerance", 0.01)
         self.declare_parameter("use_execute_trajectory", True)
         self.declare_parameter("max_workers", 4)
-        self.declare_parameter("task_queue_size", 5)
+        self.declare_parameter("task_queue_size", 20)
         self.declare_parameter("log_level", "info")
         self.declare_parameter("enable_perf_log", False)
         self.declare_parameter("tf_cache_time", 5.0)
         self.declare_parameter("joint_state_timeout", 1.0)
         self.declare_parameter("tf_retry_count", 2)  # 减少重试次数
         self.declare_parameter("tf_retry_delay", 0.02)  # 增加重试延迟
-        self.declare_parameter("planning_retry_count", 3)
+        self.declare_parameter("planning_retry_count", 1)
         self.declare_parameter("min_success_rate_log", 95.0)
         self.declare_parameter("tf_lookup_timeout", 0.01)  # TF查询超时
-        self.declare_parameter("pose_publish_rate", 100.0)  # 姿态发布频率
-        self.declare_parameter("status_monitor_rate", 100.0)  # 状态监控频率
+        self.declare_parameter("pose_publish_rate", 10.0)  # 姿态发布频率
+        self.declare_parameter("status_monitor_rate", 1.0)  # 状态监控频率
         self.declare_parameter("use_async_tf", True)  # 使用异步TF查询
         self.declare_parameter("tf_use_latest", True)  # 使用最新TF数据
 
@@ -288,7 +288,7 @@ class UltimateMoveToPoseNode(Node):
             PoseStamped,
             "/target_end_effector_pose",
             self._target_pose_callback,
-            100,
+            10,
             callback_group=self.fast_callback_group,
         )
 
@@ -297,7 +297,7 @@ class UltimateMoveToPoseNode(Node):
             PoseStamped,
             "/cartesian_linear_move",
             self._cartesian_move_callback,
-            100,
+            10,
             callback_group=self.fast_callback_group,
         )
 
@@ -306,7 +306,7 @@ class UltimateMoveToPoseNode(Node):
             PoseStamped,
             "/z_axis_linear_move",
             self._z_move_callback,
-            100,
+            10,
             callback_group=self.fast_callback_group,
         )
 
@@ -471,43 +471,14 @@ class UltimateMoveToPoseNode(Node):
             self.services_ready = True
 
     def get_robot_state(self):
-        """获取当前机器人状态 - 增加实时性"""
-        try:
-            # 增加状态新鲜度检查
-            joint_state = self.current_joint_state
+        """获取当前机器人状态"""
+        joint_state = self.current_joint_state
 
-            # 检查关节状态是否过期或为空
-            if (
-                joint_state is None
-                or time.time() - self.last_joint_state_time > 0.005  # 减少到50ms
-            ):
-                # 返回更保守的默认状态
-                robot_state = RobotState()
-                robot_state.joint_state = JointState()
-                robot_state.joint_state.name = self.joint_names
-
-                # 如果有缓存状态，使用缓存（即使稍微过期）
-                if joint_state is not None:
-                    robot_state.joint_state.position = list(joint_state.position)
-                else:
-                    robot_state.joint_state.position = [0.0] * len(self.joint_names)
-
-                robot_state.is_diff = True
-                robot_state.joint_state.header.stamp = self.get_clock().now().to_msg()
-                return robot_state
-
-            # 使用当前关节状态，但要确保时间戳是最新的
-            robot_state = RobotState()
-            robot_state.joint_state = joint_state
-            robot_state.joint_state.header.stamp = self.get_clock().now().to_msg()
-            robot_state.is_diff = True
-
-            return robot_state
-
-        except Exception as e:
-            self.log_throttled(
-                "debug", f"获取机器人状态错误: {str(e)}", "get_state_error", 2.0
-            )
+        # 检查关节状态是否过期
+        if (
+            joint_state is None
+            or time.time() - self.last_joint_state_time > self.joint_state_timeout
+        ):
             # 返回默认状态
             robot_state = RobotState()
             robot_state.joint_state = JointState()
@@ -515,6 +486,12 @@ class UltimateMoveToPoseNode(Node):
             robot_state.joint_state.position = [0.0] * len(self.joint_names)
             robot_state.is_diff = True
             return robot_state
+
+        # 使用当前关节状态
+        robot_state = RobotState()
+        robot_state.joint_state = joint_state
+        robot_state.is_diff = True
+        return robot_state
 
     def _get_tf_transform(self):
         """获取TF变换（核心优化）"""
@@ -647,7 +624,7 @@ class UltimateMoveToPoseNode(Node):
                 request.link_name = self.end_effector_link
                 request.waypoints = waypoints
                 request.max_step = self.cartesian_step_size
-                request.jump_threshold = 3.0
+                request.jump_threshold = 0.0
                 request.avoid_collisions = True
                 request.path_constraints = Constraints()
 
@@ -682,7 +659,7 @@ class UltimateMoveToPoseNode(Node):
                         self.perf_stats["planning_time"].pop(0)
 
                     fraction = response.fraction
-                    if fraction > 0.90:
+                    if fraction > 0.95:
                         self.log_throttled(
                             "debug",
                             f"笛卡尔规划成功: {fraction*100:.1f}% ({planning_time:.2f}s)",
@@ -819,109 +796,23 @@ class UltimateMoveToPoseNode(Node):
 
         return constraints
 
-    def _preprocess_trajectory(self, trajectory, current_state):
-        """预处理轨迹，确保起始状态一致"""
-        if trajectory is None or not trajectory.joint_trajectory.points:
-            return trajectory
-
-        try:
-            # 获取轨迹的第一个点
-            first_point = trajectory.joint_trajectory.points[0]
-
-            # 获取当前关节位置
-            current_positions = current_state.joint_state.position
-
-            # 检查偏差
-            max_deviation = 0.0
-            deviation_joint = -1
-
-            for i, (planned, current) in enumerate(
-                zip(first_point.positions, current_positions)
-            ):
-                deviation = abs(planned - current)
-                if deviation > max_deviation:
-                    max_deviation = deviation
-                    deviation_joint = i
-
-            # 如果偏差超过阈值，调整轨迹起始点
-            if max_deviation > 0.005:  # 5mm或度的阈值
-                self.log_throttled(
-                    "debug",
-                    f"调整轨迹起始点，关节{deviation_joint}偏差: {max_deviation:.4f}",
-                    "trajectory_adjust",
-                    1.0,
-                )
-
-                # 创建调整后的轨迹点列表
-                adjusted_points = []
-
-                # 第一个点使用当前状态（带微小偏移以避免零速问题）
-                adjusted_first_point = JointTrajectoryPoint()
-                adjusted_first_point.positions = list(current_positions)
-
-                # 如果只有一个点，直接返回当前位置
-                if len(trajectory.joint_trajectory.points) == 1:
-                    adjusted_first_point.time_from_start = (
-                        trajectory.joint_trajectory.points[0].time_from_start
-                    )
-                    adjusted_points.append(adjusted_first_point)
-                else:
-                    # 保持原来的时间间隔，但位置从当前位置开始
-                    adjusted_first_point.time_from_start = (
-                        trajectory.joint_trajectory.points[0].time_from_start
-                    )
-                    adjusted_points.append(adjusted_first_point)
-
-                    # 后续点保持相对关系
-                    for i in range(1, len(trajectory.joint_trajectory.points)):
-                        point = trajectory.joint_trajectory.points[i]
-                        adjusted_point = JointTrajectoryPoint()
-                        adjusted_point.positions = list(point.positions)
-                        adjusted_point.time_from_start = point.time_from_start
-                        adjusted_points.append(adjusted_point)
-
-                # 更新轨迹
-                trajectory.joint_trajectory.points = adjusted_points
-
-            return trajectory
-
-        except Exception as e:
-            self.log_throttled(
-                "debug", f"轨迹预处理错误: {str(e)}", "traj_preprocess_error", 2.0
-            )
-            return trajectory
-
     def _execute_trajectory(self, trajectory):
-        """执行轨迹 - 增加状态同步"""
+        """执行轨迹"""
         if trajectory is None:
             return False
 
         try:
-            # 在执行前获取最新状态
-            current_state = self.get_robot_state()
-
-            # 预处理轨迹，确保起始状态一致
-            trajectory = self._preprocess_trajectory(trajectory, current_state)
-
             start_time = time.time()
 
             goal_msg = ExecuteTrajectory.Goal()
             goal_msg.trajectory = trajectory
 
-            # 设置执行选项
-            if hasattr(goal_msg, "allowed_start_tolerance"):
-                goal_msg.allowed_start_tolerance = 0.02  # 增大容差
-
             future = self.execute_action_client.send_goal_async(goal_msg)
 
             # 等待响应
             start_wait = time.time()
-            timeout = 10.0
-
-            execution_success = False
-
             while rclpy.ok() and not future.done():
-                if time.time() - start_wait > timeout:
+                if time.time() - start_wait > 10.0:
                     self.log_throttled("warn", "轨迹执行超时", "execution_timeout", 2.0)
                     return False
                 time.sleep(0.001)
@@ -935,44 +826,15 @@ class UltimateMoveToPoseNode(Node):
                     self.perf_stats["execution_time"].pop(0)
 
                 if goal_handle.accepted:
-                    # 等待执行完成
                     self.log_throttled(
                         "debug",
                         f"轨迹执行已接受 ({execution_time:.2f}s)",
                         "execution_accepted",
                         1.0,
                     )
+                    return True
 
-                    # 获取结果
-                    result_future = goal_handle.get_result_async()
-                    result_timeout = execution_time * 1000.0  # 预估时间的两倍
-                    # result_timeout = execution_time * 500.0  # 预估时间的两倍
-
-                    result_start = time.time()
-
-                    while rclpy.ok() and not result_future.done():
-                        if time.time() - result_start > result_timeout:
-                            self.log_throttled(
-                                "warn", "等待结果超时", "result_timeout", 2.0
-                            )
-                            break
-                        time.sleep(0.001)
-
-                    if result_future.done():
-                        result = result_future.result()
-                        if result and result.result.error_code.val == 1:  # SUCCESS
-                            execution_success = True
-                        else:
-                            self.log_throttled(
-                                "warn",
-                                f"轨迹执行失败: {result.result.error_code.val if result else '无结果'}",
-                                "execution_failed",
-                                2.0,
-                            )
-                    else:
-                        execution_success = True  # 如果没收到结果但动作已接受，假设成功
-
-            return execution_success
+            return False
 
         except Exception as e:
             self.log_throttled(
@@ -981,94 +843,54 @@ class UltimateMoveToPoseNode(Node):
             return False
 
     def _move_to_pose_precision(self, pose_stamped):
-        """高精度移动到姿态 - 增加重试和状态同步"""
-        max_retries = 3
-        last_exception = None
+        """高精度移动到姿态"""
+        try:
+            # 使用MoveIt2规划（带重试）
+            trajectory = self._plan_to_pose_moveit(
+                pose_stamped, retry_count=self.planning_retry_count
+            )
 
-        for attempt in range(max_retries):
-            try:
-                # 等待新鲜状态
-                if not self._wait_for_fresh_joint_state(0.05):
+            if trajectory is not None:
+                success = self._execute_trajectory(trajectory)
+
+                if success:
+                    self.stats["target_pose_success"] += 1
+                    self.stats["success"] += 1
+                    return True
+                else:
+                    # 尝试笛卡尔规划作为后备（也带重试）
                     self.log_throttled(
-                        "debug",
-                        f"尝试{attempt+1}: 等待新鲜状态超时",
-                        "wait_state_timeout",
-                        1.0,
+                        "info",
+                        "高精度执行失败，尝试笛卡尔规划",
+                        "fallback_cartesian",
+                        2.0,
                     )
-
-                # 使用MoveIt2规划
-                trajectory = self._plan_to_pose_moveit(
-                    pose_stamped, retry_count=max(1, self.planning_retry_count // 3)
+                    return self._move_to_pose_cartesian(pose_stamped)
+            else:
+                # 直接尝试笛卡尔规划
+                self.log_throttled(
+                    "info", "高精度规划失败，尝试笛卡尔规划", "direct_cartesian", 2.0
                 )
+                return self._move_to_pose_cartesian(pose_stamped)
 
-                if trajectory is not None:
-                    # 预处理轨迹
-                    current_state = self.get_robot_state()
-                    trajectory = self._preprocess_trajectory(trajectory, current_state)
-
-                    success = self._execute_trajectory(trajectory)
-
-                    if success:
-                        self.stats["target_pose_success"] += 1
-                        self.stats["success"] += 1
-                        return True
-                    else:
-                        if attempt < max_retries - 1:
-                            self.log_throttled(
-                                "info",
-                                f"执行失败，重试 {attempt+1}/{max_retries}",
-                                "execution_retry",
-                                1.0,
-                            )
-                            time.sleep(0.05)  # 短暂延迟后重试
-                        else:
-                            # 尝试笛卡尔规划作为后备
-                            self.log_throttled(
-                                "info",
-                                "高精度执行失败，尝试笛卡尔规划",
-                                "fallback_cartesian",
-                                2.0,
-                            )
-                            return self._move_to_pose_cartesian(pose_stamped)
-                else:
-                    if attempt < max_retries - 1:
-                        time.sleep(0.05)
-                    else:
-                        # 直接尝试笛卡尔规划
-                        self.log_throttled(
-                            "info",
-                            "高精度规划失败，尝试笛卡尔规划",
-                            "direct_cartesian",
-                            2.0,
-                        )
-                        return self._move_to_pose_cartesian(pose_stamped)
-
-            except Exception as e:
-                last_exception = e
-                if attempt < max_retries - 1:
-                    time.sleep(0.05)
-                else:
-                    self.log_throttled(
-                        "debug", f"高精度移动错误: {str(e)}", "precision_error", 2.0
-                    )
-
-        self.stats["failed"] += 1
-        return False
+        except Exception as e:
+            self.log_throttled(
+                "debug", f"高精度移动错误: {str(e)}", "precision_error", 2.0
+            )
+            self.stats["failed"] += 1
+            return False
 
     def _move_to_pose_cartesian(self, pose_stamped):
         """笛卡尔移动到姿态"""
         try:
             target_pose = pose_stamped.pose
 
-            for _ in range(10):
-                # 计算笛卡尔路径（带重试）
-                trajectory, fraction = self._compute_cartesian_path(
-                    [target_pose], retry_count=self.planning_retry_count
-                )
-                if fraction > 0.90:
-                    break
+            # 计算笛卡尔路径（带重试）
+            trajectory, fraction = self._compute_cartesian_path(
+                [target_pose], retry_count=self.planning_retry_count
+            )
 
-            if trajectory is None or fraction < 0.90:
+            if trajectory is None or fraction < 0.95:
                 self.log_throttled(
                     "warn",
                     f"笛卡尔规划失败: {fraction*100:.1f}%",
@@ -1201,12 +1023,8 @@ class UltimateMoveToPoseNode(Node):
                 time.sleep(0.01)
 
     def _process_single_task(self, task, task_start):
-        """处理单个任务 - 增加队列管理"""
+        """处理单个任务"""
         try:
-            # 检查是否有任务在执行，如果有则稍等
-            while self.pending_tasks > 0 and time.time() - self.last_task_time < 0.1:
-                time.sleep(0.01)  # 等待10ms
-
             queue_wait_time = time.time() - task_start
             self.perf_stats["queue_wait_time"].append(queue_wait_time)
 
@@ -1217,28 +1035,53 @@ class UltimateMoveToPoseNode(Node):
             task_data = task.get("data")
 
             success = False
-
-            # 在执行前同步等待最新关节状态
-            self._wait_for_fresh_joint_state(timeout=0.1)
-
             if task_type == "target_pose":
                 success = self._move_to_pose_precision(task_data)
             elif task_type == "cartesian_move":
-                if len(task_data) == 4:
+                # 根据数据长度判断是绝对位置还是相对位置移动
+                if len(task_data) == 4:  # 绝对位置：x, y, z, orientation
                     target_x, target_y, target_z, target_orientation = task_data
                     success = self._linear_move_cartesian_absolute(
                         target_x, target_y, target_z, target_orientation
                     )
-                else:
+                else:  # 相对位置：x_offset, y_offset, z_offset
                     success = self._linear_move_cartesian(*task_data)
             elif task_type == "z_move":
                 success = self._z_axis_move(task_data)
 
-            # 任务完成后短暂延迟，避免状态冲突
-            time.sleep(0.01)
-
             # 更新统计
-            self._update_stats(success, task_start)
+            self.stats["total"] += 1
+
+            # 更新最近成功率统计
+            if self.recent_results.full():
+                old_result = self.recent_results.get()
+                if old_result:
+                    self.stats["recent_success"] -= 1
+                self.stats["recent_total"] -= 1
+
+            self.recent_results.put(success)
+            if success:
+                self.stats["recent_success"] += 1
+            self.stats["recent_total"] += 1
+
+            # 计算响应时间
+            response_time = time.time() - task_start
+            self.stats["avg_response_time"] = (
+                (
+                    self.stats["avg_response_time"] * (self.stats["total"] - 1)
+                    + response_time
+                )
+                / self.stats["total"]
+                if self.stats["total"] > 0
+                else response_time
+            )
+
+            self.stats["max_response_time"] = max(
+                self.stats["max_response_time"], response_time
+            )
+            self.stats["min_response_time"] = min(
+                self.stats["min_response_time"], response_time
+            )
 
             # 标记任务完成
             self.task_queue.task_done()
@@ -1254,19 +1097,14 @@ class UltimateMoveToPoseNode(Node):
             self.pending_tasks -= 1
 
             # 失败也计入最近成功率
-            self._update_recent_stats(False)
+            if self.recent_results.full():
+                old_result = self.recent_results.get()
+                if old_result:
+                    self.stats["recent_success"] -= 1
+                self.stats["recent_total"] -= 1
 
-    def _wait_for_fresh_joint_state(self, timeout=0.1):
-        """等待新鲜的关节状态"""
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            if (
-                self.current_joint_state is not None
-                and time.time() - self.last_joint_state_time < 0.05
-            ):  # 50ms内的状态
-                return True
-            time.sleep(0.001)
-        return False
+            self.recent_results.put(False)
+            self.stats["recent_total"] += 1
 
     def _target_pose_callback(self, msg):
         """目标姿态回调"""
@@ -1402,7 +1240,7 @@ class UltimateMoveToPoseNode(Node):
                 else:
                     status_parts.append(f"成功率:{success_rate:.1f}%")
 
-                status_parts.append(f"响应:{self.stats['avg_response_time']:.4f}s")
+                status_parts.append(f"响应:{self.stats['avg_response_time']:.2f}s")
 
                 # TF成功率
                 if self.perf_stats["tf_lookups"] > 0:
@@ -1431,7 +1269,7 @@ class UltimateMoveToPoseNode(Node):
 
         except Exception as e:
             self.log_throttled(
-                "debug", f"状态监控错误: {str(e)}", "status_monitor_error", 2.0
+                "debug", f"状态监控错误: {str(e)}", "status_monitor_error", 10.0
             )
 
     def destroy_node(self):

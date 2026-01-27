@@ -19,6 +19,9 @@ joint_limits:
     has_acceleration_limits: true  # 修改为 true
     max_acceleration: 20.27         # 对应峰值角加速度 3.27 rad/s²
   arm_joint3:
+    has_position_limits: true
+    min_position: -3.3161
+    max_position: 0.0
     has_velocity_limits: true
     max_velocity: 10.472
     has_acceleration_limits: true  # 修改为 true

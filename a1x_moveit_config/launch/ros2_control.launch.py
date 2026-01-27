@@ -1,13 +1,30 @@
 from launch import LaunchDescription
-from launch.actions import RegisterEventHandler, ExecuteProcess
+from launch.actions import RegisterEventHandler, ExecuteProcess, DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessStart
-from launch.substitutions import Command, PathJoinSubstitution
+from launch.substitutions import Command, PathJoinSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
+    # 声明是否启动 joint_state_broadcaster 的参数
+    use_joint_state_broadcaster_arg = DeclareLaunchArgument(
+        "use_joint_state_broadcaster",
+        default_value="true",
+        description="是否启动 joint_state_broadcaster"
+    )
+    use_joint_state_broadcaster = LaunchConfiguration("use_joint_state_broadcaster")
+    
+    # 声明 not_use_joint_state_broadcaster 参数
+    not_use_joint_state_broadcaster_arg = DeclareLaunchArgument(
+        "not_use_joint_state_broadcaster",
+        default_value="false",
+        description="不启动 joint_state_broadcaster"
+    )
+    not_use_joint_state_broadcaster = LaunchConfiguration("not_use_joint_state_broadcaster")
+
     # 获取机器人描述 - 修正URDF文件路径
     robot_description_content = ParameterValue(
         Command(
@@ -39,6 +56,7 @@ def generate_launch_description():
                    "--controller-manager-timeout", "60",
                    "--namespace", ""],
         output="screen",
+        condition=IfCondition(use_joint_state_broadcaster)
     )
 
     # 定义a1x_group_controller启动节点
@@ -53,17 +71,33 @@ def generate_launch_description():
     )
 
     # 注册事件处理器，确保在joint_state_broadcaster启动后再启动控制器
+    # 当use_joint_state_broadcaster为false时，直接启动a1x_group_controller
     delay_a1x_group_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         OnProcessStart(
             target_action=joint_state_broadcaster_spawner,
             on_start=[
                 a1x_group_controller_spawner,
             ],
-        )
+        ),
+        condition=IfCondition(use_joint_state_broadcaster)
+    )
+
+    # 当use_joint_state_broadcaster为false时，直接启动a1x_group_controller
+    a1x_group_controller_spawner_direct = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["a1x_group_controller",
+                   "--controller-manager", "/controller_manager",
+                   "--controller-manager-timeout", "60",
+                   "--namespace", ""],
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("not_use_joint_state_broadcaster", default="false"))
     )
 
     return LaunchDescription([
+        use_joint_state_broadcaster_arg,
         control_node,
         joint_state_broadcaster_spawner,
         delay_a1x_group_controller_spawner_after_joint_state_broadcaster_spawner,
+        a1x_group_controller_spawner_direct,
     ])

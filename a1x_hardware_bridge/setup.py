@@ -29,6 +29,12 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": ["a1x_bridge = a1x_hardware_bridge.a1x_bridge:main"],
+        "console_scripts": [
+            "a1x_bridge = a1x_hardware_bridge.a1x_bridge:main",
+            "joint_state_remap = a1x_hardware_bridge.joint_state_remap:main"
+        ],
+        "controller_manager.hardware_interface": [
+            "a1x_hardware_bridge/A1XHardwareInterface = a1x_hardware_bridge.a1x_hardware_interface:A1XHardwareInterface"
+        ],
     },
 )
